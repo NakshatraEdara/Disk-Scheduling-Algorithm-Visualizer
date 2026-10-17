@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disk Scheduling Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0d1220;--panel:#151c30;--line:#27304a;--text:#e9e6dc;--mute:#9aa3bd;--gold:#c9a96a;
+--fcfs:#6ea8f0;--sstf:#47c2a5;--scan:#a592f0;--cscan:#e8899b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,sans-serif;line-height:1.5}
+body{background:radial-gradient(900px 500px at 85% -10%,#1b2447 0,transparent 60%),var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;align-items:center;gap:22px;margin-bottom:26px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:clamp(1.9rem,4vw,2.9rem);margin:0;letter-spacing:-.01em;line-height:1.1}
+header p{margin:6px 0 0;color:var(--mute);max-width:56ch}
+.platter{flex:none;width:92px;height:92px}
+.spin{transform-origin:50px 50px;animation:spin 9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.controls{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:16px;align-items:end}
+label{display:block;font-size:.82rem;color:var(--mute);margin-bottom:6px}
+input,select{width:100%;background:#0f1527;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.row2{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:18px}
+button{font:inherit;font-weight:700;border-radius:8px;padding:10px 18px;border:1px solid var(--line);background:#0f1527;color:var(--text);cursor:pointer}
+button.primary{background:var(--gold);color:#18140a;border-color:var(--gold)}
+button:hover{filter:brightness(1.12)}
+.chk{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:.88rem}
+.chk input{width:auto}
+.speed{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:.88rem;margin-left:auto}
+.speed input{width:120px;padding:0}
+#err{color:#f0a0a8;margin-top:12px;min-height:1.2em;font-size:.9rem}
+h2{font-family:Fraunces,Georgia,serif;font-weight:500;font-size:1.45rem;margin:34px 0 14px}
+.bars{display:grid;gap:12px}
+.bar{display:grid;grid-template-columns:90px 1fr 150px;gap:14px;align-items:center}
+.bar b{font-weight:700}
+.track{height:14px;background:#0f1527;border-radius:7px;overflow:hidden}
+.fill{height:100%;border-radius:7px;width:0;transition:width .8s ease}
+.bar span{color:var(--mute);font-size:.88rem;text-align:right;font-variant-numeric:tabular-nums}
+.best{color:var(--gold);font-weight:700}
+.verdict{margin-top:16px;color:var(--mute);font-size:.95rem}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;border-top:3px solid var(--c)}
+.card h3{margin:0;font-family:Fraunces,Georgia,serif;font-weight:700;font-size:1.3rem;color:var(--c)}
+.card .sub{color:var(--mute);font-size:.85rem;margin-bottom:8px}
+.stats{display:flex;gap:22px;margin:8px 0 10px;font-variant-numeric:tabular-nums}
+.stats div{font-size:.8rem;color:var(--mute)}
+.stats strong{display:block;font-size:1.35rem;color:var(--text);font-family:Fraunces,Georgia,serif}
+.chart{overflow-x:auto;border-radius:10px;background:#0f1527;border:1px solid var(--line)}
+.chart svg{display:block;min-width:440px;width:100%;height:auto}
+.seq{margin:10px 0 0;font-size:.82rem;color:var(--mute);word-break:break-word}
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:.92rem}
+.tbl th{color:var(--mute);font-weight:500}
+.scroll{overflow-x:auto}
+footer{margin-top:40px;color:var(--mute);font-size:.85rem}
+@media(max-width:860px){.controls{grid-template-columns:1fr 1fr}.controls .wide{grid-column:1/-1}.grid{grid-template-columns:1fr}.bar{grid-template-columns:70px 1fr}.bar span{grid-column:1/-1;text-align:left}.speed{margin-left:0}header{flex-direction:column;align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<svg class="platter" viewBox="0 0 100 100" aria-hidden="true">
+<circle cx="50" cy="50" r="46" fill="#151c30" stroke="#c9a96a" stroke-width="1.5"/>
+<g class="spin"><circle cx="50" cy="50" r="36" fill="none" stroke="#27304a" stroke-width="1"/><circle cx="50" cy="50" r="26" fill="none" stroke="#27304a" stroke-width="1"/><path d="M50 4a46 46 0 0 1 40 23" fill="none" stroke="#a592f0" stroke-width="2.5" stroke-linecap="round"/><path d="M50 96a46 46 0 0 1-40-23" fill="none" stroke="#47c2a5" stroke-width="2.5" stroke-linecap="round"/></g>
+<circle cx="50" cy="50" r="7" fill="#c9a96a"/><path d="M92 14 58 46" stroke="#e9e6dc" stroke-width="3" stroke-linecap="round"/>
+</svg>
+<div>
+<h1>Disk Scheduling Visualizer</h1>
+<p>Enter your own requests and watch FCFS, SSTF, SCAN and C-SCAN move the disk head side by side.</p>
+</div>
+</header>
+
+<section class="panel" aria-label="Inputs">
+<div class="controls">
+<div class="wide"><label for="reqs">Request queue (cylinders, separated by commas or spaces)</label><input id="reqs" value="98, 183, 37, 122, 14, 124, 65, 67"></div>
+<div><label for="head">Initial head position</label><input id="head" type="number" value="53" min="0"></div>
+<div><label for="max">Highest cylinder</label><input id="max" type="number" value="199" min="10"></div>
+<div><label for="dir">Head direction (SCAN, C-SCAN)</label><select id="dir"><option value="r">Toward higher cylinders</option><option value="l">Toward lower cylinders</option></select></div>
+</div>
+<div class="row2">
+<button class="primary" id="run">Run simulation</button>
+<button id="rand">Random queue</button>
+<button id="ex">Textbook example</button>
+<label class="chk"><input type="checkbox" id="jump" checked> Count C-SCAN return jump</label>
+<label class="speed">Speed <input type="range" id="spd" min="1" max="6" value="3"></label>
+</div>
+<div id="err" role="alert"></div>
+</section>
+
+<h2>Total head movement</h2>
+<section class="panel" id="cmp" aria-live="polite"></section>
+
+<h2>Head path, step by step</h2>
+<section class="grid" id="grid"></section>
+
+<h2>Summary table</h2>
+<section class="panel scroll"><table class="tbl" id="tbl"></table></section>
+
+<footer>SCAN and C-SCAN travel to the disk edge before turning, as in most textbooks. Seek distance is the number of cylinders crossed.</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ALGS=[
+{k:'fcfs',n:'FCFS',d:'First come, first served',c:'#6ea8f0'},
+{k:'sstf',n:'SSTF',d:'Shortest seek time first',c:'#47c2a5'},
+{k:'scan',n:'SCAN',d:'Elevator: sweep to one edge, then reverse',c:'#a592f0'},
+{k:'cscan',n:'C-SCAN',d:'Sweep to one edge, jump back, sweep again',c:'#e8899b'}];
+let anim=null;
+
+function path(k,reqs,head,max,right){
+ const pts=[{c:head}];const add=(c,j)=>{if(pts[pts.length-1].c!==c||j)pts.push({c,j:!!j})};
+ const asc=reqs.slice().sort((a,b)=>a-b),desc=asc.slice().reverse();
+ if(k==='fcfs')reqs.forEach(r=>add(r));
+ else if(k==='sstf'){const rem=reqs.slice();let cur=head;while(rem.length){let bi=0;rem.forEach((r,i)=>{if(Math.abs(r-cur)<Math.abs(rem[bi]-cur))bi=i});cur=rem.splice(bi,1)[0];add(cur)}}
+ else if(k==='scan'){
+  if(right){asc.filter(r=>r>=head).forEach(r=>add(r));add(max);desc.filter(r=>r<head).forEach(r=>add(r))}
+  else{desc.filter(r=>r<=head).forEach(r=>add(r));add(0);asc.filter(r=>r>head).forEach(r=>add(r))}}
+ else{
+  if(right){asc.filter(r=>r>=head).forEach(r=>add(r));add(max);add(0,true);asc.filter(r=>r<head).forEach(r=>add(r))}
+  else{desc.filter(r=>r<=head).forEach(r=>add(r));add(0);add(max,true);desc.filter(r=>r>head).forEach(r=>add(r))}}
+ return pts;
+}
+function total(pts,countJump){let t=0;for(let i=1;i<pts.length;i++){if(pts[i].j&&!countJump)continue;t+=Math.abs(pts[i].c-pts[i-1].c)}return t}
+
+function read(){
+ const err=m=>{$('err').textContent=m;return null};
+ const reqs=$('reqs').value.split(/[\s,;]+/).filter(Boolean).map(Number);
+ const head=Number($('head').value),max=Number($('max').value);
+ if(!reqs.length)return err('Add at least one cylinder number to the request queue.');
+ if(reqs.some(isNaN))return err('The request queue can only contain numbers.');
+ if(reqs.length>30)return err('Use 30 requests or fewer so the charts stay readable.');
+ if(isNaN(max)||max<10)return err('Highest cylinder must be 10 or more.');
+ if(isNaN(head)||head<0||head>max)return err('Head position must be between 0 and '+max+'.');
+ if(reqs.some(r=>r<0||r>max||!Number.isInteger(r)))return err('Every request must be a whole number between 0 and '+max+'.');
+ $('err').textContent='';
+ return {reqs,head,max,right:$('dir').value==='r',cj:$('jump').checked};
+}
+
+function build(a,p,max,cj,reqs){
+ const W=560,padX=28,rowH=30,top=44,H=top+(p.length)*rowH+14;
+ const X=c=>padX+c/max*(W-2*padX),Y=i=>top+i*rowH;
+ let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${a.n} head path">`;
+ for(let t=0;t<=4;t++){const c=Math.round(max*t/4),x=X(c);s+=`<line x1="${x}" y1="30" x2="${x}" y2="${H-8}" stroke="#27304a" stroke-dasharray="3 5"/><text x="${x}" y="18" fill="#9aa3bd" font-size="11" text-anchor="middle">${c}</text>`}
+ let segs='';
+ for(let i=1;i<p.length;i++)segs+=`<line class="sg" x1="${X(p[i-1].c)}" y1="${Y(i-1)}" x2="${X(p[i-1].c)}" y2="${Y(i-1)}" stroke="${a.c}" stroke-width="2.2" stroke-linecap="round" ${p[i].j?'stroke-dasharray="5 5" opacity=".7"':''}/>`;
+ s+=segs;
+ p.forEach((q,i)=>{const isReq=i===0||reqs.includes(q.c);s+=`<circle class="pt" data-i="${i}" cx="${X(q.c)}" cy="${Y(i)}" r="${isReq?4:3}" fill="${i===0?'#c9a96a':isReq?a.c:'#0f1527'}" stroke="${a.c}" stroke-width="1.5" opacity="0"/><text class="lb" data-i="${i}" x="${X(q.c)+8}" y="${Y(i)+4}" fill="#e9e6dc" font-size="11" opacity="0">${q.c}</text>`});
+ s+=`<circle class="head" r="7" fill="#c9a96a" stroke="#0d1220" stroke-width="2" cx="${X(p[0].c)}" cy="${Y(0)}"/></svg>`;
+ return {svg:s,X,Y};
+}
+
+function render(){
+ const d=read();if(!d)return;
+ cancelAnimationFrame(anim);
+ const {reqs,head,max,right,cj}=d;
+ const res=ALGS.map(a=>{const p=path(a.k,reqs,head,max,right);return {a,p,t:total(p,cj)}});
+ const best=Math.min(...res.map(r=>r.t)),worst=Math.max(...res.map(r=>r.t));
+ const seekMs=1;
+ $('cmp').innerHTML='<div class="bars">'+res.map(r=>`<div class="bar"><b style="color:${r.a.c}">${r.a.n}</b><div class="track"><div class="fill" data-w="${worst?r.t/worst*100:0}" style="background:${r.a.c}"></div></div><span class="${r.t===best?'best':''}">${r.t} cylinders${r.t===best?' · lowest':''}</span></div>`).join('')+
+ `</div><p class="verdict">${res.filter(r=>r.t===best).map(r=>r.a.n).join(' and ')} moved the head the least for this queue${worst>best?`, saving ${worst-best} cylinders compared with ${res.find(r=>r.t===worst).a.n}`:''}.</p>`;
+ requestAnimationFrame(()=>document.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w+'%'));
+ const cards=res.map(r=>{const b=build(r.a,r.p,max,cj,reqs);r.b=b;
+  return `<article class="card" style="--c:${r.a.c}"><h3>${r.a.n}</h3><div class="sub">${r.a.d}</div><div class="stats"><div>Total movement<strong>${r.t}</strong></div><div>Average per request<strong>${(r.t/reqs.length).toFixed(1)}</strong></div></div><div class="chart">${b.svg}</div><p class="seq">Order: ${r.p.map(q=>q.c).join(' → ')}</p></article>`}).join('');
+ $('grid').innerHTML=cards;
+ $('tbl').innerHTML='<tr><th>Algorithm</th><th>Total movement</th><th>Average per request</th><th>Seek time at 1 ms per cylinder</th><th>Stops on path</th></tr>'+res.map(r=>`<tr><td style="color:${r.a.c};font-weight:700">${r.a.n}</td><td>${r.t}</td><td>${(r.t/reqs.length).toFixed(1)}</td><td>${r.t*seekMs} ms</td><td>${r.p.length-1}</td></tr>`).join('');
+ play(res);
+}
+
+function play(res){
+ const cards=[...document.querySelectorAll('.card')];
+ const state=res.map((r,i)=>({r,el:cards[i],sg:[...cards[i].querySelectorAll('.sg')],pt:[...cards[i].querySelectorAll('.pt')],lb:[...cards[i].querySelectorAll('.lb')],hd:cards[i].querySelector('.head')}));
+ state.forEach(s=>{s.pt[0].setAttribute('opacity',1);s.lb[0].setAttribute('opacity',1)});
+ const stepMs=[900,650,450,300,200,120][+$('spd').value-1]||450;
+ const t0=performance.now();
+ if(matchMedia('(prefers-reduced-motion:reduce)').matches){state.forEach(s=>frame(s,s.r.p.length-1));return}
+ (function tick(now){
+  const el=(now-t0)/stepMs;let alive=false;
+  state.forEach(s=>{const n=s.r.p.length-1;if(frame(s,Math.min(el,n))<n)alive=true});
+  if(alive)anim=requestAnimationFrame(tick);
+ })(t0);
+}
+function frame(s,t){
+ const {X,Y}=s.r.b,p=s.r.p,full=Math.floor(t),f=t-full;
+ s.sg.forEach((l,i)=>{
+  const a=p[i],b=p[i+1];
+  if(i<full){l.setAttribute('x2',X(b.c));l.setAttribute('y2',Y(i+1))}
+  else if(i===full&&f>0){l.setAttribute('x2',X(a.c)+(X(b.c)-X(a.c))*f);l.setAttribute('y2',Y(i)+(Y(i+1)-Y(i))*f)}
+ });
+ for(let i=0;i<=full&&i<p.length;i++){s.pt[i].setAttribute('opacity',1);s.lb[i].setAttribute('opacity',1)}
+ if(full<p.length-1){const a=p[full],b=p[full+1];s.hd.setAttribute('cx',X(a.c)+(X(b.c)-X(a.c))*f);s.hd.setAttribute('cy',Y(full)+(Y(full+1)-Y(full))*f)}
+ else{s.hd.setAttribute('cx',X(p[p.length-1].c));s.hd.setAttribute('cy',Y(p.length-1))}
+ return t;
+}
+
+$('run').onclick=render;
+$('jump').onchange=render;$('dir').onchange=render;
+$('rand').onclick=()=>{const m=Math.max(10,Number($('max').value)||199);$('reqs').value=Array.from({length:8},()=>Math.floor(Math.random()*(m+1))).join(', ');$('head').value=Math.floor(Math.random()*(m+1));render()};
+$('ex').onclick=()=>{$('reqs').value='98, 183, 37, 122, 14, 124, 65, 67';$('head').value=53;$('max').value=199;$('dir').value='r';$('jump').checked=true;render()};
+['reqs','head','max'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')render()}));
+render();
+</script>
+</body>
+</html>
